@@ -60,10 +60,10 @@ void JacobiRichardson(int J_ORDER, int J_ITE_MAX, double* J_ERROR, double** MA, 
     double e = 100;
     double* X;
     double* MAstartimes;
-    double* Xk = (double*) malloc(sizeof(double) * J_ORDER);
-    memcpy(Xk, MB, sizeof(double) * J_ORDER);
+    double* Xk = (double*) malloc(sizeof(double) * J_ORDER);//aloca Xk para armazenar sempre a iteracao anterior.
+    memcpy(Xk, MB, sizeof(double) * J_ORDER);//inicialmente Xk(na primeira iteracao, o X0) recebe os valores do vetor B*
 
-    while (e > *J_ERROR && iterations < J_ITE_MAX) {
+    while (e > *J_ERROR && iterations < J_ITE_MAX) {//enquanto for maior que erro permitido e nao atingir numero maximo de iteracao
         ++iterations;//incremente numero de iteracoes
         MAstartimes = MAstartimesXk(J_ORDER, MA, Xk);//calcula MA* vezes Xk
         X = sub_MBMAstartimesXk(J_ORDER, MB, MAstartimes);//subtrai MB* do resultado anterior. X eh o Xk+1
