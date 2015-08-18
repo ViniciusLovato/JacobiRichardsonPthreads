@@ -4,7 +4,11 @@
 #include <string.h>
 
 /*modo de uso: programa nome_do_arquivo_de_entrada
-Eg: main teste.txt*/
+Eg: main teste.txt
+
+pra compilar:
+gcc main.c -o main -std=c99
+*/
 
 
 /*divide matriz A e matriz B(aka vetor B) pela diagonal da Matriz A, e faz diagonal de Matriz A ser 0. Isso faz a matriz A virar matriz A*(matriz A modificada, aka MAstar) e a matriz B virar matriz B*(matriz B modificada, aka MBstar). Ver pdf explicando o metodo de Jacobi. Recebe como parametro a ordem da matriz e as matrizes*/
@@ -127,11 +131,13 @@ double get_error(int J_ORDER, double X[], double Xk[]) {
 
 double max_arrayval(int J_ORDER, double ar[]) {
 	//retorna valor maximo de vetor
-    double maxValue = ar[0];
+    double maxValue = fabs(ar[0]);
+	double nextabsolute;
 
     for (int i = 1; i < J_ORDER; ++i) {
-        if (ar[i] > maxValue) {
-            maxValue = ar[i];
+		nextabsolute = fabs(ar[i]);
+        if (nextabsolute > maxValue) {
+            maxValue = nextabsolute;
         }
     }
 
