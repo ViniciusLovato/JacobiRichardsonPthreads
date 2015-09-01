@@ -121,7 +121,7 @@ void set_begin_end(int begin[], int end[], int nthreads, int total_work_for_each
 	begin[0] = 0;
 	end[0]   = total_work_for_first_thread - 1;
 	for (int i = 1; i < nthreads; ++i) {
-		begin[i] = end[i - 1] + 1;\
+		begin[i] = end[i - 1] + 1;
 		end[i] = begin[i] + total_work_for_each_thread - 1;
 	}
 }
