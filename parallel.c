@@ -8,7 +8,7 @@
 Eg: parallel teste.txt 2
 
 pra compilar:
-gcc parallel.c -o parallel -std=c99 -pthread
+gcc parallel.c -o parallel -std=gnu99 -pthread -Wall
 */
 
 /*cria as threads. Foi necessario usar macro porque sem ela da erro de "dereference void* pointer"*/
@@ -31,9 +31,14 @@ typedef struct {
 } MAandMBdividebydiagonal_args;
 
 typedef struct {
+	pthread_barrier_t* barrier;
 	int J_ORDER;
 	int begin;
 	int end;
+	int J_ITE_MAX;
+	int* iterations;
+	double* e;
+	double* J_ERROR;
 	double** MAstar;
 	double* MAstartimes;
 	double* Xk;
@@ -51,7 +56,7 @@ void setMAandMBdividebydiagonal_args(MAandMBdividebydiagonal_args arguments[], i
 void* MAandMBdividebydiagonal(void* args);
 
 /*seta os argumentos da funcao MAstartimesXk. Recebe como parametro o vetor de argumentos para setar(arguments) e as variaveis que vao ser usadas para isso(J_ORDER, begin, etc)*/
-void setMAstartimesXk_args(MAstartimesXk_args arguments[], int J_ORDER, int begin[], int end[], double** MAstar, double* MAstartimes, double Xk[], int nthreads);
+void setMAstartimesXk_args(MAstartimesXk_args arguments[], pthread_barrier_t* barrier, int J_ORDER, int begin[], int end[], int J_ITE_MAX, int* iterations, double* e, double* J_ERROR, double** MAstar, double* MAstartimes, double Xk[], int nthreads);
 /*multiplica a matriz A* por Xk*/
 void* MAstartimesXk(void* args);
 
@@ -159,11 +164,16 @@ void* MAandMBdividebydiagonal(void* args) {
 	pthread_exit(NULL);
 }
 
-void setMAstartimesXk_args(MAstartimesXk_args arguments[], int J_ORDER, int begin[], int end[], double** MAstar, double* MAstartimes, double Xk[], int nthreads) {
+void setMAstartimesXk_args(MAstartimesXk_args arguments[], pthread_barrier_t* barrier, int J_ORDER, int begin[], int end[], int J_ITE_MAX, int* iterations, double* e, double* J_ERROR, double** MAstar, double* MAstartimes, double Xk[], int nthreads) {
 	for (int i = 0; i < nthreads; ++i) {
+		arguments[i].barrier 	  = barrier;
 		arguments[i].J_ORDER 	  = J_ORDER;
 		arguments[i].begin   	  = begin[i];
 		arguments[i].end     	  = end[i];
+		arguments[i].J_ITE_MAX	  = J_ITE_MAX;
+		arguments[i].iterations	  =	iterations;
+		arguments[i].e			  = e;
+		arguments[i].J_ERROR	  = J_ERROR;
 		arguments[i].MAstar  	  = MAstar;
 		arguments[i].MAstartimes  = MAstartimes;
 		arguments[i].Xk           = Xk;
@@ -172,21 +182,30 @@ void setMAstartimesXk_args(MAstartimesXk_args arguments[], int J_ORDER, int begi
 
 void* MAstartimesXk(void* args) {
 	MAstartimesXk_args* arguments = args;
+	pthread_barrier_t* barrier = arguments->barrier;
+
 	int J_ORDER 		= arguments->J_ORDER;
 	int begin   		= arguments->begin;
 	int end     		= arguments->end;
+	int J_ITE_MAX		= arguments->J_ITE_MAX;
+	int* iterations		= arguments->iterations;
+	double* e			= arguments->e;
+	double* J_ERROR		= arguments->J_ERROR;
 	double** MAstar 	= arguments->MAstar;
 	double* MAstartimes = arguments->MAstartimes;
  	double* Xk 			= arguments->Xk;
 
 	//multiplicacao de matriz por vetor
-    for (int i = begin; i <= end; ++i) {
-		MAstartimes[i] = 0.0;//zera vetor primeiro
-        for (int j = 0;  j < J_ORDER; ++j) {
-            MAstartimes[i] += MAstar[i][j] * Xk[j];
-        }
-    }
-	
+	while(*e > *J_ERROR && *iterations < J_ITE_MAX) {
+		for (int i = begin; i <= end; ++i) {
+			MAstartimes[i] = 0.0;//zera vetor primeiro
+		    for (int j = 0;  j < J_ORDER; ++j) {
+		        MAstartimes[i] += MAstar[i][j] * Xk[j];
+		    }
+		}
+		pthread_barrier_wait (barrier);
+		pthread_barrier_wait (barrier);
+	}
     pthread_exit(NULL);
 }
 
@@ -197,20 +216,24 @@ int JacobiRichardson(int J_ORDER, int J_ITE_MAX, int J_ROW_TEST, double* J_ERROR
     double* X;//X eh o Xk+1
     double* MAstartimes = (double*) malloc(sizeof(double) * J_ORDER);
     double* Xk = (double*) malloc(sizeof(double) * J_ORDER);//aloca Xk para armazenar sempre a iteracao anterior.
+	pthread_barrier_t   barrier; // barrier synchronization object
 
     memcpy(Xk, MBstar, sizeof(double) * J_ORDER);//inicialmente Xk(na primeira iteracao, o X0) recebe os valores do vetor B*
 	MAstartimesXk_args MAstartimesXk_arguments[nthreads];//cria vetor de argumentos pra funcao MAstartimesXk
 	
-	setMAstartimesXk_args(MAstartimesXk_arguments, J_ORDER, begin, end, MAstar, MAstartimes, Xk, nthreads);//seta os argumentos da funcao MAstartimesXk
-    while (e > *J_ERROR && iterations < J_ITE_MAX) {//enquanto for maior que erro permitido e nao atingir numero maximo de iteracao
-        ++iterations;//incremente numero de iteracoes
-		create_threads(MAstartimesXk, MAstartimesXk_arguments, thr, nthreads);//cria as threads
-		wait_threads(thr, nthreads);//espera as threads acabarem antes de continuar
+	setMAstartimesXk_args(MAstartimesXk_arguments, &barrier, J_ORDER, begin, end, J_ITE_MAX, &iterations, &e, J_ERROR, MAstar, MAstartimes, Xk, nthreads);//seta os argumentos da funcao MAstartimesXk
+	pthread_barrier_init (&barrier, NULL, nthreads + 1);
+	create_threads(MAstartimesXk, MAstartimesXk_arguments, thr, nthreads);//cria as threads
+
+    while (e > *J_ERROR && iterations < J_ITE_MAX) {//enquanto for maior que erro permitido e nao atingir numero maximo de iteracao      
+		pthread_barrier_wait(&barrier);
 		X = sub_MBMAstartimesXk(J_ORDER, MBstar, MAstartimes);//subtrai MB* do resultado anterior. X eh o Xk+1
+		++iterations;//incrementa numero de iteracoes
         e = get_error(J_ORDER, X, Xk);//calcula erro
         memcpy(Xk, X, sizeof(double) * J_ORDER);//atualiza Xk
+		pthread_barrier_wait(&barrier);
     }
-	
+
 	//imprime numero de iteracoes e resultado em determinada linha
 	printf("iterations: %d\nRowTest: %d => [%f] =? %f\n", iterations, J_ROW_TEST, result_row(X, MA, J_ROW_TEST, J_ORDER), MB[J_ROW_TEST]);
     free(X);
