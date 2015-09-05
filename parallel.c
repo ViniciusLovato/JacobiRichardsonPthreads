@@ -61,8 +61,8 @@ void setMAstartimesXk_args(MAstartimesXk_args arguments[], pthread_barrier_t* ba
 void* MAstartimesXk(void* args);
 
 
-/*subtrai matriz B* por matrizA* multiplicado por Xk. Faz parte da formula da iteratividade do metodo de Jacobi. Retorna a matriz(vetor) resultante. Recebe como parametro a ordem da matriz, a matriz MB* e a matriz A* multiplicado por Xk(MAstartimes)*/
-double* sub_MBMAstartimesXk(int J_ORDER, double MBstar[], double MAstartimes[]);
+/*subtrai matriz B* por matrizA* multiplicado por Xk. Faz parte da formula da iteratividade do metodo de Jacobi. Recebe como parametro a ordem da matriz, a matriz MB*, a matriz A* multiplicado por Xk(MAstartimes) e o vetor Xk+1*/
+void sub_MBMAstartimesXk(int J_ORDER, double MBstar[], double MAstartimes[], double X[]);
 /*aplica o metodo de Jacobi propriamente dito. Recebe a ordem da matriz, numero maximo de iteracoes permitido, linha pra testar, erro, matriz MA*, matriz MB*, numero de threads, vetor de comeco, fim, e as threads*/
 int JacobiRichardson(int J_ORDER, int J_ITE_MAX, int J_ROW_TEST, double* J_ERROR, double** MA, double MB[], double** MAstar, double MBstar[], int nthreads, int begin[], int end[], pthread_t thr[]);
 /*calcula erro pela formula do pdf. Recebe ordem da matriz, o vetor de X atual(X) e o vetor de X anterior(Xk)*/
@@ -213,7 +213,7 @@ void* MAstartimesXk(void* args) {
 int JacobiRichardson(int J_ORDER, int J_ITE_MAX, int J_ROW_TEST, double* J_ERROR, double** MA, double MB[], double** MAstar, double MBstar[], int nthreads, int begin[], int end[], pthread_t thr[]) {    	
 	int iterations = 1;
     double e = 100;
-    double* X;//X eh o Xk+1
+    double* X = (double*) malloc(sizeof(double) * J_ORDER);//X eh o Xk+1
     double* MAstartimes = (double*) malloc(sizeof(double) * J_ORDER);
     double* Xk = (double*) malloc(sizeof(double) * J_ORDER);//aloca Xk para armazenar sempre a iteracao anterior.
 	pthread_barrier_t   barrier; // barrier synchronization object
@@ -227,7 +227,7 @@ int JacobiRichardson(int J_ORDER, int J_ITE_MAX, int J_ROW_TEST, double* J_ERROR
 
     while (e > *J_ERROR && iterations < J_ITE_MAX) {//enquanto for maior que erro permitido e nao atingir numero maximo de iteracao      
 		pthread_barrier_wait(&barrier);
-		X = sub_MBMAstartimesXk(J_ORDER, MBstar, MAstartimes);//subtrai MB* do resultado anterior. X eh o Xk+1
+		sub_MBMAstartimesXk(J_ORDER, MBstar, MAstartimes, X);//subtrai MB* do resultado anterior. X eh o Xk+1
 		++iterations;//incrementa numero de iteracoes
         e = get_error(J_ORDER, X, Xk);//calcula erro
         memcpy(Xk, X, sizeof(double) * J_ORDER);//atualiza Xk
@@ -251,13 +251,11 @@ double result_row(double* X, double** MA, int J_ROW_TEST, int J_ORDER) {
 	return result;
 }
 
-double* sub_MBMAstartimesXk(int J_ORDER, double MBstar[], double MAstartimes[]) {
-	//subtrai MB* de MA* vezes Xk
-    double* vect = (double*) malloc(sizeof(double) * J_ORDER);
+void sub_MBMAstartimesXk(int J_ORDER, double MBstar[], double MAstartimes[], double X[]) {
+	//subtrai MB* de MA* vezes Xk e armazena em Xk+1
     for (int i = 0; i < J_ORDER; ++i) {
-        vect[i] = MBstar[i] - MAstartimes[i];
+        X[i] = MBstar[i] - MAstartimes[i];
     }
-    return vect;
 
 }
 

@@ -15,8 +15,8 @@ gcc main.c -o main -std=c99
 void MAandMBdividebydiagonal(int J_ORDER, double** MA, double MB[], double** MAstar, double MBstar[]);
 /*multiplica a matriz A* por Xk. Ver pdf explicando o metodo de Jacobi.Recebe como parametro a ordem da matriz e as matrizes e retorna a matriz(vetor) resultante*/
 void MAstartimesXk(int J_ORDER, double** MAstar, double MAstartimes[], double Xk[]);
-/*subtrai matriz B* por matrizA* multiplicado por Xk. Faz parte da formula da iteratividade do metodo de Jacobi. Retorna a matriz(vetor) resultante. Recebe como parametro a ordem da matriz, a matriz MB* e a matriz A* multiplicado por Xk(MAstartimes)*/
-double* sub_MBMAstartimesXk(int J_ORDER, double MBstar[], double MAstartimes[]);
+/*subtrai matriz B* por matrizA* multiplicado por Xk. Faz parte da formula da iteratividade do metodo de Jacobi. Recebe como parametro a ordem da matriz, a matriz MB*, a matriz A* multiplicado por Xk(MAstartimes) e o vetor Xk+1*/
+void sub_MBMAstartimesXk(int J_ORDER, double MBstar[], double MAstartimes[], double X[]);
 /*aplica o metodo de Jacobi propriamente dito. Recebe a ordem da matriz, numero maximo de iteracoes permitido, linha pra testar, erro, matriz MA* e matriz MB* */
 void JacobiRichardson(int J_ORDER, int J_ITE_MAX, int J_ROW_TEST, double* J_ERROR, double** MA, double MB[], double** MAstar, double MBstar[]);
 /*calcula erro pela formula do pdf. Recebe ordem da matriz, o vetor de X atual(X) e o vetor de X anterior(Xk)*/
@@ -64,7 +64,7 @@ void MAandMBdividebydiagonal(int J_ORDER, double** MA, double MB[], double** MAs
 void JacobiRichardson(int J_ORDER, int J_ITE_MAX, int J_ROW_TEST, double* J_ERROR, double** MA, double MB[], double** MAstar, double MBstar[]) {    
 	int iterations = 1;
     double e = 100;
-    double* X;
+    double* X = (double*) malloc(sizeof(double) * J_ORDER);//X eh o Xk+1
     double* MAstartimes = (double*) malloc(sizeof(double) * J_ORDER);
     double* Xk = (double*) malloc(sizeof(double) * J_ORDER);//aloca Xk para armazenar sempre a iteracao anterior.
     memcpy(Xk, MBstar, sizeof(double) * J_ORDER);//inicialmente Xk(na primeira iteracao, o X0) recebe os valores do vetor B*
@@ -72,7 +72,7 @@ void JacobiRichardson(int J_ORDER, int J_ITE_MAX, int J_ROW_TEST, double* J_ERRO
     while (e > *J_ERROR && iterations < J_ITE_MAX) {//enquanto for maior que erro permitido e nao atingir numero maximo de iteracao
         ++iterations;//incremente numero de iteracoes
         MAstartimesXk(J_ORDER, MAstar, MAstartimes, Xk);//calcula MA* vezes Xk     
-		X = sub_MBMAstartimesXk(J_ORDER, MBstar, MAstartimes);//subtrai MB* do resultado anterior. X eh o Xk+1
+		sub_MBMAstartimesXk(J_ORDER, MBstar, MAstartimes, X);//subtrai MB* do resultado anterior. X eh o Xk+1
         e = get_error(J_ORDER, X, Xk);//calcula erro
         memcpy(Xk, X, sizeof(double) * J_ORDER);//atualiza Xk
 
@@ -104,13 +104,11 @@ void MAstartimesXk(int J_ORDER, double** MAstar, double MAstartimes[], double Xk
     }
 }
 
-double* sub_MBMAstartimesXk(int J_ORDER, double MBstar[], double MAstartimes[]) {
-	//subtrai MB* de MA* vezes Xk
-    double* vect = (double*) malloc(sizeof(double) * J_ORDER);
+void sub_MBMAstartimesXk(int J_ORDER, double MBstar[], double MAstartimes[], double X[]) {
+	//subtrai MB* de MA* vezes Xk e armazena em Xk+1
     for (int i = 0; i < J_ORDER; ++i) {
-        vect[i] = MBstar[i] - MAstartimes[i];
+        X[i] = MBstar[i] - MAstartimes[i];
     }
-    return vect;
 
 }
 
